@@ -46,14 +46,19 @@ const Ui = {
 };
 
 const FastApi = {
-	baseUrl: "https://api.fast.com/netflix/speedtest/v2?https=true&token=YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm&urlCount=",
+	baseUrl: "https://api.fast.com/netflix/speedtest/v2?token=YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm&urlCount=",
 	count: 1,
 	averageSpeed: 0,
 
 	async getFastComConfiguration() {
-		const response = await fetch(this.baseUrl + this.count);
-		const data = await response.json();
-		return data.targets.map((target) => target.url);
+		try {
+			const response = await fetch(this.baseUrl + this.count);
+			const data = await response.json();
+			return data.targets.map((target) => target.url);
+		} catch (error) {
+			console.error("Problem configuring API: " + error.message);
+			Ui.errorHandler(error.message);
+		}
 	},
 
 	async run() {
