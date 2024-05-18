@@ -1,44 +1,96 @@
-/////////////////////////////////
-/// ....
-///
-/// .....
-///
 const Ui = {
 	els: {},
 
+	updateValues(speed) {
+		this.els.result.innerText = `${speed.toFixed(0)}`;
+	},
+
+	async startBandwidthTest() {
+		_hide(this.els.errorContainer);
+		this.showLoader();
+		const response = await FastApi.run();
+		this.hideLoader();
+		if (response.averageSpeed) {
+			this.updateValues(response.averageSpeed);
+		} else {
+			this.errorHandler(response.error);
+		}
+	},
+
+	showLoader() {
+		_hide(this.els.resultContainer);
+		_show(this.els.loaderContainer);
+	},
+
+	hideLoader() {
+		_hide(this.els.loaderContainer);
+		_show(this.els.resultContainer);
+	},
+
+	errorHandler(error) {
+		_hide(this.els.resultContainer);
+		_show(this.els.errorContainer);
+		this.els.errorSub.innerText = error;
+	},
+
 	init() {
 		this.els.buttonRun = document.getElementById("runTest");
+		this.els.resultContainer = document.getElementsByClassName("resultContainer")[0];
 		this.els.result = document.getElementById("result");
-
-		this.els.buttonRun.addEventListener("click", () => Test.run());
+		this.els.loaderContainer = document.getElementsByClassName("loaderContainer")[0];
+		this.els.errorContainer = document.getElementsByClassName("errorContainer")[0];
+		this.els.errorMain = document.getElementsByClassName("errorMain")[0];
+		this.els.errorSub = document.getElementsByClassName("errorSub")[0];
+		this.els.buttonRun.addEventListener("click", () => this.startBandwidthTest());
 	},
 };
 
-const Test = {
+const FastApi = {
+	baseUrl: "https://api.fast.com/netflix/speedtest/v2?https=true&token=YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm&urlCount=",
+	count: 1,
+	averageSpeed: 0,
+
+	async getFastComConfiguration() {
+		const response = await fetch(this.baseUrl + this.count);
+		const data = await response.json();
+		return data.targets.map((target) => target.url);
+	},
+
 	async run() {
-		const fileUrl =
-			"https://images.unsplash.com/photo-1593642532871-8b12e02d091c?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&w=2400"; // URL of a known file size
-		const fileSize = 0.98; // File size in bytes (1MB)
-		const fetchOptions = {
-			mode: "no-cors",
-			cache: "no-cache",
-		};
+		let totalSpeed = 0;
+		let testCount = 0;
 
 		try {
-			const startTime = performance.now();
+			const testUrls = await this.getFastComConfiguration();
 
-			const response = await fetch(fileUrl, fetchOptions);
-			const blob = await response.blob();
+			for (let i = 0; i < this.count; i++) {
+				const url = testUrls[i];
 
-			const endTime = performance.now();
-			const duration = (endTime - startTime) / 1000; // Convert to seconds
+				const startTime = performance.now();
 
-			const speedMbps = (fileSize * 8) / duration; // Convert to Mbps
+				const response = await fetch(url);
+				const blob = await response.blob();
 
-			Ui.els.result.innerText = `${speedMbps.toFixed(2)}`;
+				const endTime = performance.now();
+				const duration = (endTime - startTime) / 1000; // Convert to seconds
+
+				const fileSize = blob.size; // Get the size of the downloaded file in bytes
+
+				const speedMbps = (fileSize * 8) / (duration * 1000000); // Convert to Mbps
+				totalSpeed += speedMbps;
+				testCount++;
+
+				this.averageSpeed = totalSpeed / testCount; // Calculate the average speed so far
+			}
 		} catch (error) {
-			Ui.els.result.getElementById("result").innerText = "Error testing bandwidth: " + error.message;
+			console.error("Error testing bandwidth: " + error.message);
+			return {
+				averageSpeed: null,
+				error: error.message,
+			};
 		}
+
+		return { averageSpeed: this.averageSpeed };
 	},
 };
 
